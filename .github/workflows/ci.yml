@@ -60,3 +60,31 @@ jobs:
       - name: Stop
         if: always()
         run: docker compose down
+
+  browser-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Playwright
+        run: |
+          npm install --no-save playwright@1.56.0
+          npx playwright install --with-deps chromium
+      - name: Start isolated HTTP test stack with one admin account
+        env:
+          RANDLY_SECURE_COOKIES: "false"
+          RANDLY_RESERVATION_ADMIN_IDS: "1"
+        run: docker compose up -d --build --wait
+      - name: Click through individual invitations with Chromium
+        run: node tests/self-service-browser.cjs
+      - name: Container logs if failed
+        if: failure()
+        run: docker compose logs --tail 120
+      - name: Stop isolated test stack
+        if: always()
+        run: docker compose down --volumes
