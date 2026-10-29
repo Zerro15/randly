@@ -15,6 +15,7 @@ class RandlyApiTests(unittest.TestCase):
         import main
         main.DB_PATH = self.db
         main.COOKIE_SECURE = False
+        main.RESERVATION_ADMINS = set()
         main._login_failures.clear()
         main.init_db()
         self.client = TestClient(app)
@@ -92,6 +93,8 @@ class RandlyApiTests(unittest.TestCase):
 
 
     def test_private_result_reservations(self):
+        import main
+        main.RESERVATION_ADMINS = {"bookinghost"}
         guest = TestClient(app)
         other = TestClient(app)
         registered = self.client.post("/api/auth/register", json={
@@ -116,6 +119,16 @@ class RandlyApiTests(unittest.TestCase):
         self.assertEqual(other.get(endpoint).status_code, 403)
         self.assertEqual(other.put(endpoint, json={"slot": 2, "number": 9}).status_code, 403)
         self.assertEqual(other.request("DELETE", endpoint + "/2", json={}).status_code, 403)
+        # A normal user owning their own room still does NOT gain booking rights.
+        other_room = other.post("/api/rooms", json={
+            "title": "Unprivileged room", "min_value": 1,
+            "max_value": 9, "no_repeats": True
+        })
+        self.assertEqual(other_room.status_code, 201)
+        other_code = other_room.json()["code"]
+        self.assertEqual(other.get(f"/api/rooms/{other_code}/reservations").status_code, 403)
+        self.assertFalse(other.get(f"/api/rooms/{other_code}").json()["can_reserve"])
+
 
         self.assertEqual(self.client.put(endpoint, json={"slot": 2, "number": 9}).status_code, 200)
         self.assertEqual(self.client.put(endpoint, json={"slot": 4, "number": 7}).status_code, 200)
@@ -128,6 +141,8 @@ class RandlyApiTests(unittest.TestCase):
                          [(2, 9), (4, 7)])
         public = guest.get(url).json()
         self.assertTrue(public["prepared_mode"])
+        self.assertFalse(public["can_reserve"])
+        self.assertTrue(self.client.get(url).json()["can_reserve"])
         self.assertNotIn("reservations", public)
         self.assertIsNone(public["latest"])
 
