@@ -37,8 +37,8 @@ async function openTask(page, invitation, expected, recipient) {
   await page.getByRole('button', { name: 'Открыть моё задание' }).waitFor({ state: 'visible' });
   const button = page.getByRole('button', { name: 'Открыть моё задание' });
   await assert.doesNotReject(() => button.click({ timeout: 15000 }));
-  await page.locator('#result').getByText(String(expected), { exact: true }).waitFor({ timeout: 15000 });
-  await page.locator('#recipient').getByText(recipient + ' — задание №' + expected).waitFor();
+  await page.waitForFunction(expectedNumber => document.getElementById('result').textContent.trim() === expectedNumber, String(expected), { timeout: 15000 });
+  await page.locator('#recipient').filter({ hasText: recipient + ' — задание №' + expected }).waitFor();
 }
 
 async function main() {
@@ -93,7 +93,7 @@ async function main() {
 
     await max.reload();
     await max.getByRole('button', { name: 'Открыть моё задание' }).click();
-    await max.locator('#result').getByText('7', {exact:true}).waitFor();
+    await max.waitForFunction(() => document.getElementById('result').textContent.trim() === '7');
     const afterRepeat = await publicPage.evaluate(async code =>
       (await fetch('/api/rooms/' + code)).json(), code);
     assert.equal(afterRepeat.history.length, 2, 'Repeated self-reveal must not create a new draw');
