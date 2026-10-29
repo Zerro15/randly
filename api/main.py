@@ -243,12 +243,12 @@ def set_preferences(data: PreferencesPayload, request: Request):
 
 
 def serialize_room(db, row, viewer_id=None):
-    entries = db.execute("SELECT number,created_at FROM draws WHERE room_id=? ORDER BY id DESC LIMIT 30",
+    entries = db.execute("SELECT id,number,created_at FROM draws WHERE room_id=? ORDER BY id DESC LIMIT 30",
                          (row["id"],)).fetchall()
     return {"code": row["code"], "title": row["title"], "min": row["min_value"],
             "max": row["max_value"], "no_repeats": bool(row["no_repeats"]),
             "host": row["username"], "is_host": viewer_id == row["owner_id"],
-            "history": [{"number": x["number"], "at": timestamp(x["created_at"])} for x in entries],
+            "history": [{"id": x["id"], "number": x["number"], "at": timestamp(x["created_at"])} for x in entries],
             "latest": entries[0]["number"] if entries else None}
 
 
