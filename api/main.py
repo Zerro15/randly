@@ -64,10 +64,21 @@ def init_db():
           id INTEGER PRIMARY KEY, room_id INTEGER NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
           number INTEGER NOT NULL, created_at INTEGER NOT NULL);
         CREATE INDEX IF NOT EXISTS draws_room_id_idx ON draws(room_id,id);
+        CREATE TABLE IF NOT EXISTS room_reservations (
+          room_id INTEGER NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+          slot INTEGER NOT NULL CHECK(slot BETWEEN 1 AND 1000),
+          number INTEGER NOT NULL,
+          created_at INTEGER NOT NULL,
+          PRIMARY KEY(room_id, slot));
+        CREATE INDEX IF NOT EXISTS reservations_room_number ON room_reservations(room_id, number);
         CREATE TABLE IF NOT EXISTS preferences (
           user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
           payload TEXT NOT NULL);
         """)
+        # Upgrade existing databases without losing previously drawn results.
+        columns = {r["name"] for r in db.execute("PRAGMA table_info(draws)")}
+        if "source" not in columns:
+            db.execute("ALTER TABLE draws ADD COLUMN source TEXT NOT NULL DEFAULT 'random'")
 
 
 @asynccontextmanager
@@ -165,6 +176,11 @@ class PreferencesPayload(BaseModel):
     values: dict
 
 
+class ReservationInput(BaseModel):
+    slot: int = Field(ge=1, le=1000)
+    number: int
+
+
 @app.get("/api/health")
 def health():
     return {"ok": True}
@@ -249,12 +265,16 @@ def set_preferences(data: PreferencesPayload, request: Request):
 
 
 def serialize_room(db, row, viewer_id=None):
-    entries = db.execute("SELECT id,number,created_at FROM draws WHERE room_id=? ORDER BY id DESC LIMIT 30",
+    entries = db.execute("SELECT id,number,source,created_at FROM draws WHERE room_id=? ORDER BY id DESC LIMIT 30",
                          (row["id"],)).fetchall()
+    prepared_count = db.execute(
+        "SELECT count(*) FROM room_reservations WHERE room_id=?", (row["id"],)
+    ).fetchone()[0]
     return {"code": row["code"], "title": row["title"], "min": row["min_value"],
             "max": row["max_value"], "no_repeats": bool(row["no_repeats"]),
             "host": row["username"], "is_host": viewer_id == row["owner_id"],
-            "history": [{"id": x["id"], "number": x["number"], "at": timestamp(x["created_at"])} for x in entries],
+            "prepared_mode": prepared_count > 0,
+            "history": [{"id": x["id"], "number": x["number"], "source": x["source"], "at": timestamp(x["created_at"])} for x in entries],
             "latest": entries[0]["number"] if entries else None}
 
 
@@ -316,6 +336,85 @@ def get_room(code: str, request: Request):
         return serialize_room(db, row, viewer_id)
 
 
+def owner_room(db, code, request):
+    """Authorize on the server; a hidden frontend panel is NOT access control."""
+    row = room_record(db, code.upper())
+    user = current_user(request, db)
+    if user["id"] != row["owner_id"]:
+        raise HTTPException(403, "Доступно только владельцу комнаты")
+    return row
+
+
+def draw_count(db, room_id):
+    return db.execute("SELECT count(*) FROM draws WHERE room_id=?", (room_id,)).fetchone()[0]
+
+
+@app.get("/api/rooms/{code}/reservations")
+def list_reservations(code: str, request: Request):
+    # Future values are intentionally never returned in the public room endpoint.
+    with connect() as db:
+        room = owner_room(db, code, request)
+        count = draw_count(db, room["id"])
+        rows = db.execute(
+            "SELECT slot,number FROM room_reservations WHERE room_id=? ORDER BY slot",
+            (room["id"],),
+        ).fetchall()
+        return {"draw_count": count, "reservations": [
+            {"slot": r["slot"], "number": r["number"], "revealed": r["slot"] <= count}
+            for r in rows
+        ]}
+
+
+@app.put("/api/rooms/{code}/reservations")
+def reserve_result(code: str, data: ReservationInput, request: Request):
+    with connect() as db:
+        db.execute("BEGIN IMMEDIATE")
+        room = owner_room(db, code, request)
+        count = draw_count(db, room["id"])
+        if data.slot <= count:
+            raise HTTPException(409, "Нельзя менять уже открытые результаты")
+        if data.number < room["min_value"] or data.number > room["max_value"]:
+            raise HTTPException(422, "Число не входит в диапазон комнаты")
+        if room["no_repeats"]:
+            used = db.execute(
+                "SELECT 1 FROM draws WHERE room_id=? AND number=? LIMIT 1",
+                (room["id"], data.number),
+            ).fetchone()
+            other = db.execute(
+                "SELECT 1 FROM room_reservations WHERE room_id=? AND number=? AND slot<>? LIMIT 1",
+                (room["id"], data.number, data.slot),
+            ).fetchone()
+            if used or other:
+                raise HTTPException(409, "Число уже выпало или забронировано в другом слоте")
+            range_size = room["max_value"] - room["min_value"] + 1
+            if data.slot > range_size:
+                raise HTTPException(422, "Номер розыгрыша превышает количество доступных чисел")
+        db.execute(
+            """INSERT INTO room_reservations(room_id,slot,number,created_at)
+               VALUES(?,?,?,?)
+               ON CONFLICT(room_id,slot) DO UPDATE SET
+                 number=excluded.number,created_at=excluded.created_at""",
+            (room["id"], data.slot, data.number, now()),
+        )
+        return {"ok": True, "slot": data.slot}
+
+
+@app.delete("/api/rooms/{code}/reservations/{slot}")
+def delete_reservation(code: str, slot: int, request: Request):
+    with connect() as db:
+        db.execute("BEGIN IMMEDIATE")
+        room = owner_room(db, code, request)
+        if slot <= draw_count(db, room["id"]):
+            raise HTTPException(409, "Открытый результат нельзя удалять из брони")
+        result = db.execute(
+            "DELETE FROM room_reservations WHERE room_id=? AND slot=?",
+            (room["id"], slot),
+        )
+        if not result.rowcount:
+            raise HTTPException(404, "Бронь не найдена")
+        return {"ok": True}
+
+
 @app.post("/api/rooms/{code}/draw")
 def draw(code: str, request: Request):
     with connect() as db:
@@ -325,16 +424,32 @@ def draw(code: str, request: Request):
         if user["id"] != row["owner_id"]:
             raise HTTPException(403, "Только организатор может запускать жеребьёвку")
         lo, hi = row["min_value"], row["max_value"]
-        if row["no_repeats"]:
+        slot = draw_count(db, row["id"]) + 1
+        reservation = db.execute(
+            "SELECT number FROM room_reservations WHERE room_id=? AND slot=?",
+            (row["id"], slot),
+        ).fetchone()
+        if reservation:
+            value = reservation["number"]
+            source = "prepared"
+        elif row["no_repeats"]:
             used = {r[0] for r in db.execute("SELECT number FROM draws WHERE room_id=?", (row["id"],))}
-            pool = [n for n in range(lo, hi + 1) if n not in used]
+            # Protect reserved future numbers, so earlier draws cannot consume them.
+            protected = {r[0] for r in db.execute(
+                "SELECT number FROM room_reservations WHERE room_id=? AND slot>?",
+                (row["id"], slot),
+            )}
+            pool = [n for n in range(lo, hi + 1) if n not in used and n not in protected]
             if not pool:
-                raise HTTPException(409, "Все числа выпали. Сбросьте историю")
+                raise HTTPException(409, "Все доступные числа заняты или выпали. Проверьте бронь")
             value = secrets.choice(pool)
+            source = "random"
         else:
             value = lo + secrets.randbelow(hi - lo + 1)
-        db.execute("INSERT INTO draws(room_id,number,created_at) VALUES (?,?,?)", (row["id"], value, now()))
-        return {"number": value}
+            source = "random"
+        db.execute("INSERT INTO draws(room_id,number,source,created_at) VALUES (?,?,?,?)",
+                   (row["id"], value, source, now()))
+        return {"number": value, "source": source}
 
 
 @app.post("/api/rooms/{code}/reset")
