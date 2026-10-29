@@ -90,6 +90,77 @@ class RandlyApiTests(unittest.TestCase):
         edge_numbers = [self.client.post(f"/api/rooms/{edge_code}/draw", json={}).json()["number"] for _ in range(3)]
         self.assertEqual(set(edge_numbers), {-1, 0, 1})
 
+
+    def test_private_result_reservations(self):
+        guest = TestClient(app)
+        other = TestClient(app)
+        registered = self.client.post("/api/auth/register", json={
+            "username": "BookingHost", "password": "long-test-password"
+        })
+        self.assertEqual(registered.status_code, 201)
+        room = self.client.post("/api/rooms", json={
+            "title": "Prepared scenario", "min_value": 1,
+            "max_value": 9, "no_repeats": True
+        })
+        self.assertEqual(room.status_code, 201, room.text)
+        code = room.json()["code"]
+        url = f"/api/rooms/{code}"
+        endpoint = url + "/reservations"
+
+        self.assertEqual(guest.get(endpoint).status_code, 401)
+        self.assertEqual(guest.put(endpoint, json={"slot": 2, "number": 9}).status_code, 401)
+        self.assertEqual(guest.delete(endpoint + "/2", json={}).status_code, 401)
+        other.post("/api/auth/register", json={
+            "username": "OtherStudent", "password": "different-test-password"
+        })
+        self.assertEqual(other.get(endpoint).status_code, 403)
+        self.assertEqual(other.put(endpoint, json={"slot": 2, "number": 9}).status_code, 403)
+        self.assertEqual(other.delete(endpoint + "/2", json={}).status_code, 403)
+
+        self.assertEqual(self.client.put(endpoint, json={"slot": 2, "number": 9}).status_code, 200)
+        self.assertEqual(self.client.put(endpoint, json={"slot": 4, "number": 7}).status_code, 200)
+        self.assertEqual(self.client.put(endpoint, json={"slot": 5, "number": 9}).status_code, 409)
+        self.assertEqual(self.client.put(endpoint, json={"slot": 3, "number": 30}).status_code, 422)
+        self.assertEqual(self.client.put(endpoint, json={"slot": 20, "number": 8}).status_code, 422)
+
+        admin_data = self.client.get(endpoint).json()
+        self.assertEqual([(r["slot"], r["number"]) for r in admin_data["reservations"]],
+                         [(2, 9), (4, 7)])
+        public = guest.get(url).json()
+        self.assertTrue(public["prepared_mode"])
+        self.assertNotIn("reservations", public)
+        self.assertIsNone(public["latest"])
+
+        first = self.client.post(url + "/draw", json={}).json()
+        self.assertNotIn(first["number"], (7, 9))
+        self.assertEqual(first["source"], "random")
+        second = self.client.post(url + "/draw", json={}).json()
+        self.assertEqual(second, {"number": 9, "source": "prepared"})
+        third = self.client.post(url + "/draw", json={}).json()
+        self.assertNotIn(third["number"], (7, 9, first["number"]))
+        fourth = self.client.post(url + "/draw", json={}).json()
+        self.assertEqual(fourth, {"number": 7, "source": "prepared"})
+
+        public_after = guest.get(url).json()
+        self.assertEqual(public_after["latest"], 7)
+        self.assertEqual(public_after["history"][0]["source"], "prepared")
+        self.assertEqual(public_after["history"][1]["source"], "random")
+        self.assertEqual(self.client.delete(endpoint + "/2", json={}).status_code, 409)
+        self.assertEqual(self.client.put(endpoint, json={"slot": 2, "number": 8}).status_code, 409)
+
+        # Reset restarts the prepared sequence; future bookings survive.
+        self.assertEqual(self.client.post(url + "/reset", json={}).status_code, 200)
+        restarted = self.client.get(endpoint).json()
+        self.assertEqual(restarted["draw_count"], 0)
+        self.assertFalse(restarted["reservations"][0]["revealed"])
+        self.client.post(url + "/draw", json={})
+        self.assertEqual(self.client.post(url + "/draw", json={}).json()["number"], 9)
+
+        # Reservation can be cancelled while still in the future.
+        self.assertEqual(self.client.delete(endpoint + "/4", json={}).status_code, 200)
+        self.assertEqual([(r["slot"], r["number"]) for r in self.client.get(endpoint).json()["reservations"]],
+                         [(2, 9)])
+
     def test_cross_site_and_validation(self):
         res=self.client.post("/api/auth/register",headers={"Origin":"https://evil.invalid"},json={"username":"someone","password":"longpassphrase"})
         self.assertEqual(res.status_code,403)
