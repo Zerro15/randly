@@ -2,14 +2,13 @@
 <meta name="description" content="Общая жеребьёвка Randly">
 <title>Randly — общая комната</title><link rel="icon" href="./favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="./account.css"><link rel="stylesheet" href="./room.css"><script src="./room.js" defer></script></head>
-<body><header class="header"><a class="logo" href="./">randly<span>.</span></a><a href="./account.html">← Мои комнаты</a></header>
+<body><header class="header"><a class="logo" href="./">randly<span>.</span></a><a href="./">← К генератору</a></header>
 <main class="wrap"><div class="room-head"><span class="tag">ОБЩАЯ ЖЕРЕБЬЁВКА</span><h1 id="roomTitle">Загрузка комнаты…</h1><p id="roomInfo" class="secondary">Все видят одинаковые результаты</p></div>
 <div class="room-grid">
 <section class="card draw-panel">
  <div class="result-label">ВЫПАВШЕЕ ЧИСЛО</div><div class="big-result" id="result" aria-live="polite">—</div>
  <p class="secondary" id="roomStatus">Ожидание жеребьёвки</p>
- <div class="host-controls" id="hostControls" hidden><button class="primary" id="drawBtn">Сгенерировать число</button><button class="outline" id="resetBtn">Сбросить историю</button></div>
- <p class="secondary" id="guestInfo">Вы наблюдаете за жеребьёвкой. Результат выбирает организатор.</p>
+ <p class="secondary" id="guestInfo">Вы смотрите общий экран. Управление результатами доступно только организатору.</p>
 </section>
 <section class="card"><h2>Пригласить участников</h2><p class="secondary">Вход в комнату без регистрации. Отправьте ссылку в чат.</p>
  <div class="invite"><input id="inviteUrl" readonly aria-label="Ссылка на комнату"><button class="outline" id="copyBtn">Копировать</button></div>
