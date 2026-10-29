@@ -23,7 +23,7 @@ from pydantic import BaseModel, Field
 DB_PATH = os.environ.get("RANDLY_DB", "/data/randly.sqlite3")
 COOKIE_SECURE = os.environ.get("RANDLY_SECURE_COOKIES", "true").lower() == "true"
 COOKIE_PATH = os.environ.get("RANDLY_COOKIE_PATH", "/")
-RESERVATION_ADMINS = {name.strip().lower() for name in os.environ.get("RANDLY_RESERVATION_ADMINS", "").split(",") if name.strip()}
+RESERVATION_ADMIN_IDS = {int(value.strip()) for value in os.environ.get("RANDLY_RESERVATION_ADMIN_IDS", "").split(",") if value.strip()}
 SESSION_SECONDS = 7 * 86400
 HASH_ROUNDS = 300_000
 USERNAME = re.compile(r"^[a-zA-Z0-9_]{3,24}$")
@@ -231,7 +231,7 @@ def login(data: Credentials, request: Request, response: Response):
 def me(request: Request):
     with connect() as db:
         user = current_user(request, db)
-        return {"username": user["username"]}
+        return {"id": user["id"], "username": user["username"]}
 
 
 @app.post("/api/auth/logout")
@@ -274,7 +274,7 @@ def serialize_room(db, row, viewer_id=None):
     return {"code": row["code"], "title": row["title"], "min": row["min_value"],
             "max": row["max_value"], "no_repeats": bool(row["no_repeats"]),
             "host": row["username"], "is_host": viewer_id == row["owner_id"],
-            "can_reserve": viewer_id == row["owner_id"] and row["username"].lower() in RESERVATION_ADMINS,
+            "can_reserve": viewer_id == row["owner_id"] and row["owner_id"] in RESERVATION_ADMIN_IDS,
             "prepared_mode": prepared_count > 0,
             "history": [{"id": x["id"], "number": x["number"], "source": x["source"], "at": timestamp(x["created_at"])} for x in entries],
             "latest": entries[0]["number"] if entries else None}
@@ -349,7 +349,7 @@ def owner_room(db, code, request):
 
 def is_reservation_admin(user):
     # Not granted by registration or room ownership. Configure explicitly on the server.
-    return user["username"].lower() in RESERVATION_ADMINS
+    return user["id"] in RESERVATION_ADMIN_IDS
 
 
 def owner_reservation_room(db, code, request):
