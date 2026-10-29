@@ -15,7 +15,7 @@ class RandlyApiTests(unittest.TestCase):
         import main
         main.DB_PATH = self.db
         main.COOKIE_SECURE = False
-        main.RESERVATION_ADMINS = set()
+        main.RESERVATION_ADMIN_IDS = set()
         main._login_failures.clear()
         main.init_db()
         self.client = TestClient(app)
@@ -94,13 +94,14 @@ class RandlyApiTests(unittest.TestCase):
 
     def test_private_result_reservations(self):
         import main
-        main.RESERVATION_ADMINS = {"bookinghost"}
+        main.RESERVATION_ADMIN_IDS = set()
         guest = TestClient(app)
         other = TestClient(app)
         registered = self.client.post("/api/auth/register", json={
             "username": "BookingHost", "password": "long-test-password"
         })
         self.assertEqual(registered.status_code, 201)
+        main.RESERVATION_ADMIN_IDS = {self.client.get("/api/auth/me").json()["id"]}
         room = self.client.post("/api/rooms", json={
             "title": "Prepared scenario", "min_value": 1,
             "max_value": 9, "no_repeats": True
