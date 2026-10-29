@@ -1,0 +1,20 @@
+services:
+  randly:
+    build: .
+    container_name: randly
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8788:8080"
+    read_only: true
+    tmpfs:
+      - /data
+      - /config
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
