@@ -1,9 +1,9 @@
 (()=>{'use strict';const $=id=>document.getElementById(id),code=new URLSearchParams(location.search).get('code')?.toUpperCase();
 const msg=s=>{$('message').textContent=s;};let lastId=null,working=false,fetching=false;
 if(!code||!(/^[A-F0-9]{10}$/.test(code))){msg('Неверная ссылка комнаты');return;}
-async function api(path,options={}){const response=await fetch('/api'+path,{credentials:'same-origin',headers:{'Content-Type':'application/json'},...options});let data;try{data=await response.json();}catch{throw Error('Ошибка соединения');}if(!response.ok)throw Error(data.detail||'Ошибка сервера');return data;}
+async function api(path,options={}){const response=await fetch(new URL('./api'+path, location.href),{credentials:'same-origin',headers:{'Content-Type':'application/json'},...options});let data;try{data=await response.json();}catch{throw Error('Ошибка соединения');}if(!response.ok)throw Error(data.detail||'Ошибка сервера');return data;}
 const url=new URL('./room.html?code='+code,location.href).href;$('inviteUrl').value=url;
-$('qr').src='/api/rooms/'+code+'/qr?url='+encodeURIComponent(url);
+$('qr').src=new URL('./api/rooms/'+code+'/qr?url='+encodeURIComponent(url),location.href).href;
 $('qr').hidden=false;
 $('qr').onerror=()=>{$('qr').hidden=true;};
 $('copyBtn').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(url);msg('Ссылка скопирована');}catch{msg('Скопируйте ссылку из поля выше');}});
