@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field
 DB_PATH = os.environ.get("RANDLY_DB", "/data/randly.sqlite3")
 COOKIE_SECURE = os.environ.get("RANDLY_SECURE_COOKIES", "true").lower() == "true"
 COOKIE_PATH = os.environ.get("RANDLY_COOKIE_PATH", "/")
+RESERVATION_ADMINS = {name.strip().lower() for name in os.environ.get("RANDLY_RESERVATION_ADMINS", "").split(",") if name.strip()}
 SESSION_SECONDS = 7 * 86400
 HASH_ROUNDS = 300_000
 USERNAME = re.compile(r"^[a-zA-Z0-9_]{3,24}$")
@@ -273,6 +274,7 @@ def serialize_room(db, row, viewer_id=None):
     return {"code": row["code"], "title": row["title"], "min": row["min_value"],
             "max": row["max_value"], "no_repeats": bool(row["no_repeats"]),
             "host": row["username"], "is_host": viewer_id == row["owner_id"],
+            "can_reserve": viewer_id == row["owner_id"] and row["username"].lower() in RESERVATION_ADMINS,
             "prepared_mode": prepared_count > 0,
             "history": [{"id": x["id"], "number": x["number"], "source": x["source"], "at": timestamp(x["created_at"])} for x in entries],
             "latest": entries[0]["number"] if entries else None}
@@ -345,6 +347,19 @@ def owner_room(db, code, request):
     return row
 
 
+def is_reservation_admin(user):
+    # Not granted by registration or room ownership. Configure explicitly on the server.
+    return user["username"].lower() in RESERVATION_ADMINS
+
+
+def owner_reservation_room(db, code, request):
+    room = owner_room(db, code, request)
+    user = current_user(request, db)
+    if not is_reservation_admin(user):
+        raise HTTPException(403, "Бронирование доступно только администратору сайта")
+    return room
+
+
 def draw_count(db, room_id):
     return db.execute("SELECT count(*) FROM draws WHERE room_id=?", (room_id,)).fetchone()[0]
 
@@ -353,7 +368,7 @@ def draw_count(db, room_id):
 def list_reservations(code: str, request: Request):
     # Future values are intentionally never returned in the public room endpoint.
     with connect() as db:
-        room = owner_room(db, code, request)
+        room = owner_reservation_room(db, code, request)
         count = draw_count(db, room["id"])
         rows = db.execute(
             "SELECT slot,number FROM room_reservations WHERE room_id=? ORDER BY slot",
@@ -369,7 +384,7 @@ def list_reservations(code: str, request: Request):
 def reserve_result(code: str, data: ReservationInput, request: Request):
     with connect() as db:
         db.execute("BEGIN IMMEDIATE")
-        room = owner_room(db, code, request)
+        room = owner_reservation_room(db, code, request)
         count = draw_count(db, room["id"])
         if data.slot <= count:
             raise HTTPException(409, "Нельзя менять уже открытые результаты")
@@ -403,7 +418,7 @@ def reserve_result(code: str, data: ReservationInput, request: Request):
 def delete_reservation(code: str, slot: int, request: Request):
     with connect() as db:
         db.execute("BEGIN IMMEDIATE")
-        room = owner_room(db, code, request)
+        room = owner_reservation_room(db, code, request)
         if slot <= draw_count(db, room["id"]):
             raise HTTPException(409, "Открытый результат нельзя удалять из брони")
         result = db.execute(
