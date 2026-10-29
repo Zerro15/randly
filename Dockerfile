@@ -1,6 +1,6 @@
 FROM caddy:2-alpine
 COPY Caddyfile /etc/caddy/Caddyfile
-COPY index.html styles.css wheel.css settings.css app.js random-core.js favicon.svg account.html account.css account.js room.html room.css room.js control.html control.css control.js /srv/
+COPY index.html styles.css wheel.css settings.css app.js random-core.js favicon.svg account.html account.css account.js room.html room.css room.js control.html control.css control.js participant.html participant.js participant.css /srv/
 RUN addgroup -S randly && adduser -S randly -G randly && chown -R randly:randly /srv
 # Caddy upstream may have cap_net_bind_service file capabilities.
 # Copying it drops xattrs so it can run with cap_drop: ALL.
