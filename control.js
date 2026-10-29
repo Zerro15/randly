@@ -7,13 +7,16 @@ if(!code||!/^[A-F0-9]{10}$/.test(code)){$('locked').textContent='Ссылка н
 const base=new URL('./api/rooms/'+code,location.href);
 async function api(path,options={}){const url=new URL(base.href+path);const res=await fetch(url,{credentials:'same-origin',headers:{'Content-Type':'application/json'},...options});let value;try{value=await res.json();}catch{throw Error('Сервер недоступен');}if(!res.ok)throw Error(typeof value.detail==='string'?value.detail:'Ошибка API');return value;}
 async function load(){if(busy)return;try{
- const data=await api(''),reservationData=await api('/reservations');
- $('locked').hidden=true;$('adminPanel').hidden=false;loaded=true;
+ const data=await api('');
+ if(!data.is_host)throw Error('Только владелец комнаты может открывать панель управления');
+ const reservationData=data.can_reserve?await api('/reservations'):null;
+ $('locked').hidden=true;$('adminPanel').hidden=false;$('reservationCard').hidden=!data.can_reserve;loaded=true;
  $('title').textContent=data.title;
  $('roomDetails').textContent='Диапазон '+data.min+'–'+data.max+' · '+(data.no_repeats?'без повторений':'повторения разрешены');
  $('latestValue').textContent=data.latest===null?'—':String(data.latest);
  $('latestSource').textContent=data.history[0]?.source==='prepared'?'Подготовленный результат':data.latest===null?'Пока нет результатов':'Случайный результат';
  $('guestLink').href=new URL('./room.html?code='+code,location.href).href;
+ if(reservationData){
  const slot=$('slot');slot.min=String(reservationData.draw_count+1);if(Number(slot.value)<reservationData.draw_count+1)slot.value=String(reservationData.draw_count+1);
  $('number').min=String(data.min);$('number').max=String(data.max);
  const list=$('reservations');list.replaceChildren();
@@ -25,6 +28,7 @@ async function load(){if(busy)return;try{
   const button=document.createElement('button');button.type='button';button.textContent='Удалить';button.disabled=entry.revealed;
   button.addEventListener('click',()=>act('/reservations/'+entry.slot,'DELETE'));
   row.append(details,button);list.append(row);
+ }
  }
  msg('');
 }catch(err){if(!loaded){$('locked').textContent='Доступ запрещён или требуется вход. '+err.message;}else msg(err.message);}}
