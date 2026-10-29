@@ -199,6 +199,102 @@ class RandlyApiTests(unittest.TestCase):
         self.assertEqual([(r["slot"], r["number"], r["recipient"]) for r in self.client.get(endpoint).json()["reservations"]],
                          [(2, 9, "Максим")])
 
+
+    def test_self_service_invites_and_independent_reveals(self):
+        import main
+        guest = TestClient(app)
+        other = TestClient(app)
+        registered = self.client.post("/api/auth/register", json={
+            "username": "SelfServiceHost", "password": "verystrongpassword"
+        })
+        self.assertEqual(registered.status_code, 201, registered.text)
+        host_id = self.client.get("/api/auth/me").json()["id"]
+
+        # Before explicit server admin assignment, self-service room creation is forbidden.
+        denied = self.client.post("/api/rooms", json={
+            "title": "No admin", "min_value": 1, "max_value": 9,
+            "no_repeats": True, "self_service": True
+        })
+        self.assertEqual(denied.status_code, 403)
+        main.RESERVATION_ADMIN_IDS = {host_id}
+        room_resp = self.client.post("/api/rooms", json={
+            "title": "Nine class tasks", "min_value": 1, "max_value": 9,
+            "no_repeats": True, "self_service": True
+        })
+        self.assertEqual(room_resp.status_code, 201, room_resp.text)
+        code = room_resp.json()["code"]
+        url = f"/api/rooms/{code}"
+        private_url = url + "/reservations"
+        self.assertTrue(guest.get(url).json()["self_service"])
+        self.assertTrue(guest.get(url).json()["prepared_mode"])
+        self.assertEqual(self.client.post(url + "/draw", json={}).status_code, 409)
+        self.assertEqual(guest.get(private_url).status_code, 401)
+
+        other.post("/api/auth/register", json={
+            "username": "StudentSelf", "password": "different-password123"
+        })
+        other_creation = other.post("/api/rooms", json={
+            "title": "Unauthorized", "min_value": 1, "max_value": 9,
+            "self_service": True
+        })
+        self.assertEqual(other_creation.status_code, 403)
+
+        for slot, number, recipient in [(1, 7, "Максим"), (2, 9, "@StudentSelf")]:
+            reservation = self.client.put(private_url, json={
+                "slot": slot, "number": number, "recipient": recipient
+            })
+            self.assertEqual(reservation.status_code, 200, reservation.text)
+        self.assertEqual(other.post(private_url + "/1/invite", json={}).status_code, 403)
+        self.assertEqual(guest.post(private_url + "/1/invite", json={}).status_code, 401)
+        self.assertEqual(guest.get(url).json()["history"], [])
+        self.assertNotIn("Максим", str(guest.get(url).json()))
+        self.assertNotIn("StudentSelf", str(guest.get(url).json()))
+
+        first_ticket = self.client.post(private_url + "/1/invite", json={}).json()["ticket"]
+        old_ticket = first_ticket
+        first_ticket = self.client.post(private_url + "/1/invite", json={}).json()["ticket"]
+        second_ticket = self.client.post(private_url + "/2/invite", json={}).json()["ticket"]
+        self.assertNotEqual(first_ticket, second_ticket)
+        self.assertEqual(guest.post(url + "/reveal", json={"ticket": old_ticket}).status_code, 404)
+        self.assertNotIn(first_ticket, str(guest.get(url).json()))
+        self.assertNotIn(second_ticket, str(self.client.get(private_url).json()))
+
+        # Second student chooses to reveal FIRST; no fixed draw order is required.
+        second = guest.post(url + "/reveal", json={"ticket": second_ticket})
+        self.assertEqual(second.status_code, 200, second.text)
+        self.assertEqual(second.json()["number"], 9)
+        self.assertEqual(second.json()["recipient"], "@StudentSelf")
+        public = guest.get(url).json()
+        self.assertEqual(len(public["history"]), 1)
+        self.assertNotIn("Максим", str(public))
+        self.assertEqual(public["latest"], 9)
+
+        # A replay/concurrent double-click is idempotent and never creates another draw.
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            results = list(pool.map(lambda _: guest.post(url + "/reveal", json={"ticket": first_ticket}), range(8)))
+        self.assertTrue(all(r.status_code == 200 for r in results), [r.text for r in results])
+        self.assertEqual({r.json()["number"] for r in results}, {7})
+        self.assertEqual(len(guest.get(url).json()["history"]), 2)
+        self.assertEqual(guest.get(url).json()["history"][0]["recipient"], "Максим")
+
+        # Cannot overwrite or revoke an already revealed assignment.
+        self.assertEqual(self.client.put(private_url, json={
+            "slot": 1, "number": 4, "recipient": "Другой"
+        }).status_code, 409)
+        self.assertEqual(self.client.post(private_url + "/1/invite", json={}).status_code, 409)
+        self.assertEqual(self.client.request("DELETE", private_url + "/1", json={}).status_code, 409)
+
+        # A reset clears publicly revealed assignments, while issued tickets remain valid.
+        self.assertEqual(self.client.post(url + "/reset", json={}).status_code, 200)
+        self.assertEqual(guest.get(url).json()["history"], [])
+        again = guest.post(url + "/reveal", json={"ticket": first_ticket})
+        self.assertEqual(again.status_code, 200)
+        self.assertFalse(again.json()["already_revealed"])
+        return_again = guest.post(url + "/reveal", json={"ticket": first_ticket})
+        self.assertEqual(return_again.status_code, 200)
+        self.assertTrue(return_again.json()["already_revealed"])
+
     def test_cross_site_and_validation(self):
         res=self.client.post("/api/auth/register",headers={"Origin":"https://evil.invalid"},json={"username":"someone","password":"longpassphrase"})
         self.assertEqual(res.status_code,403)
