@@ -25,7 +25,10 @@ async function reserve(admin, slot, number, recipient) {
 async function invite(admin, slot) {
   const item = admin.locator('.reservation-item').filter({ hasText: '№' + slot + ' · ' });
   await item.getByRole('button', { name: /Личная ссылка|Новая ссылка/ }).click();
-  await admin.locator('#invitationResult:not([hidden])').waitFor();
+  await admin.waitForFunction(() => {
+    const panel = document.getElementById('invitationResult');
+    return !panel.hidden && document.getElementById('invitationUrl').value.includes('#ticket=');
+  }, null, { timeout: 15000 });
   const link = await admin.locator('#invitationUrl').inputValue();
   assert.ok(link.includes('/participant.html?code='));
   assert.ok(link.includes('#ticket='));
@@ -68,6 +71,7 @@ async function main() {
     await reserve(admin, 2, 9, 'Илья');
     const maxLink = await invite(admin, 1);
     const ilyaLink = await invite(admin, 2);
+    assert.notEqual(maxLink, ilyaLink, 'Every invitation must have a distinct secret');
     const publicPage = await newPage();
     await publicPage.goto(BASE + '/room.html?code=' + code);
     await publicPage.locator('#roomInfo').getByText('Подготовленное распределение').waitFor();
