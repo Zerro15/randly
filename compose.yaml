@@ -30,6 +30,7 @@ services:
       RANDLY_DB: /data/randly.sqlite3
       RANDLY_COOKIE_PATH: "${RANDLY_COOKIE_PATH:-/}"
       RANDLY_SECURE_COOKIES: "${RANDLY_SECURE_COOKIES:-true}"
+      RANDLY_RESERVATION_ADMINS: "${RANDLY_RESERVATION_ADMINS:-}"
     volumes:
       - randly-db:/data
     read_only: true
