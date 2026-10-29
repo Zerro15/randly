@@ -10,9 +10,9 @@ services:
       - "127.0.0.1:8788:8080"
     read_only: true
     tmpfs:
-      - /data
-      - /config
-      - /tmp
+      - /data:mode=1777
+      - /config:mode=1777
+      - /tmp:mode=1777
     cap_drop: [ALL]
     security_opt:
       - no-new-privileges:true
@@ -28,6 +28,7 @@ services:
     restart: unless-stopped
     environment:
       RANDLY_DB: /data/randly.sqlite3
+      RANDLY_COOKIE_PATH: "${RANDLY_COOKIE_PATH:-/}"
       RANDLY_SECURE_COOKIES: "${RANDLY_SECURE_COOKIES:-true}"
     volumes:
       - randly-db:/data
