@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 
 DB_PATH = os.environ.get("RANDLY_DB", "/data/randly.sqlite3")
 COOKIE_SECURE = os.environ.get("RANDLY_SECURE_COOKIES", "true").lower() == "true"
+COOKIE_PATH = os.environ.get("RANDLY_COOKIE_PATH", "/")
 SESSION_SECONDS = 7 * 86400
 HASH_ROUNDS = 300_000
 USERNAME = re.compile(r"^[a-zA-Z0-9_]{3,24}$")
@@ -99,7 +100,7 @@ def derive(password: str, salt: str):
 
 def cookie(response, token):
     response.set_cookie("randly_session", token, max_age=SESSION_SECONDS,
-                        httponly=True, secure=COOKIE_SECURE, samesite="strict", path="/")
+                        httponly=True, secure=COOKIE_SECURE, samesite="strict", path=COOKIE_PATH)
 
 
 def issue_session(db, user_id, response):
@@ -218,7 +219,7 @@ def logout(request: Request, response: Response):
         with connect() as db:
             db.execute("DELETE FROM sessions WHERE hash=?",
                        (hashlib.sha256(token.encode()).hexdigest(),))
-    response.delete_cookie("randly_session", path="/", secure=COOKIE_SECURE, samesite="strict")
+    response.delete_cookie("randly_session", path=COOKIE_PATH, secure=COOKIE_SECURE, samesite="strict")
     return {"ok": True}
 
 
@@ -350,7 +351,7 @@ def room_qr(code: str, url: str, request: Request):
     parsed = urlsplit(url)
     if parsed.scheme not in ("http", "https") or parsed.netloc.lower() != request.headers.get("host", "").lower():
         raise HTTPException(400, "Некорректная ссылка")
-    if parsed.path != "/room.html" or parsed.query != "code=" + code.upper():
+    if not parsed.path.endswith("/room.html") or parsed.query != "code=" + code.upper():
         raise HTTPException(400, "Ссылка не соответствует комнате")
     image = qrcode.make(url, image_factory=qrcode.image.svg.SvgPathImage,
                         box_size=8, border=2)
