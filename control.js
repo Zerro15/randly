@@ -84,6 +84,9 @@
         issue.textContent = entry.invite_issued ? 'Новая ссылка' : 'Личная ссылка';
         issue.className = 'outline';
         issue.addEventListener('click', () => run(async () => {
+          // Hide previous invitation immediately; never show a stale link for another participant.
+          $('invitationResult').hidden = true;
+          $('invitationUrl').value = '';
           const result = await api('/reservations/' + entry.slot + '/invite', {
             method: 'POST', body: '{}'
           });
