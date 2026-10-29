@@ -109,13 +109,13 @@ class RandlyApiTests(unittest.TestCase):
 
         self.assertEqual(guest.get(endpoint).status_code, 401)
         self.assertEqual(guest.put(endpoint, json={"slot": 2, "number": 9}).status_code, 401)
-        self.assertEqual(guest.delete(endpoint + "/2", json={}).status_code, 401)
+        self.assertEqual(guest.request("DELETE", endpoint + "/2", json={}).status_code, 401)
         other.post("/api/auth/register", json={
             "username": "OtherStudent", "password": "different-test-password"
         })
         self.assertEqual(other.get(endpoint).status_code, 403)
         self.assertEqual(other.put(endpoint, json={"slot": 2, "number": 9}).status_code, 403)
-        self.assertEqual(other.delete(endpoint + "/2", json={}).status_code, 403)
+        self.assertEqual(other.request("DELETE", endpoint + "/2", json={}).status_code, 403)
 
         self.assertEqual(self.client.put(endpoint, json={"slot": 2, "number": 9}).status_code, 200)
         self.assertEqual(self.client.put(endpoint, json={"slot": 4, "number": 7}).status_code, 200)
@@ -145,7 +145,7 @@ class RandlyApiTests(unittest.TestCase):
         self.assertEqual(public_after["latest"], 7)
         self.assertEqual(public_after["history"][0]["source"], "prepared")
         self.assertEqual(public_after["history"][1]["source"], "random")
-        self.assertEqual(self.client.delete(endpoint + "/2", json={}).status_code, 409)
+        self.assertEqual(self.client.request("DELETE", endpoint + "/2", json={}).status_code, 409)
         self.assertEqual(self.client.put(endpoint, json={"slot": 2, "number": 8}).status_code, 409)
 
         # Reset restarts the prepared sequence; future bookings survive.
@@ -157,7 +157,7 @@ class RandlyApiTests(unittest.TestCase):
         self.assertEqual(self.client.post(url + "/draw", json={}).json()["number"], 9)
 
         # Reservation can be cancelled while still in the future.
-        self.assertEqual(self.client.delete(endpoint + "/4", json={}).status_code, 200)
+        self.assertEqual(self.client.request("DELETE", endpoint + "/4", json={}).status_code, 200)
         self.assertEqual([(r["slot"], r["number"]) for r in self.client.get(endpoint).json()["reservations"]],
                          [(2, 9)])
 
