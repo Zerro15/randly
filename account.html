@@ -31,6 +31,8 @@
      <div class="cols"><label>От <input name="min_value" type="number" value="1" min="-1000000" max="1000000" required></label>
      <label>До <input name="max_value" type="number" value="9" min="-1000000" max="1000000" required></label></div>
      <label class="checkbox"><input name="no_repeats" type="checkbox" checked> Не повторять числа до сброса</label>
+     <label class="checkbox" id="selfServiceOption" hidden><input name="self_service" type="checkbox"> Участники сами открывают задания по личной ссылке</label>
+     <p id="selfServiceDescription" class="secondary" hidden>Результаты подготавливаются заранее, затем каждый участник нажимает «Открыть задание» на своём телефоне. В обычных комнатах организатор проводит жеребьёвку.</p>
      <button class="primary wide" type="submit">Создать комнату</button>
    </form>
    <h3>Мои комнаты</h3><div id="roomsList" class="room-list"><p class="secondary">Загружаем…</p></div>
