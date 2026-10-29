@@ -8,7 +8,7 @@ import re
 import secrets
 import sqlite3
 import time
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import Lock
@@ -31,12 +31,17 @@ _login_failures = {}
 _limiter_lock = Lock()
 
 
+@contextmanager
 def connect():
     connection = sqlite3.connect(DB_PATH, timeout=15)
-    connection.row_factory = sqlite3.Row
-    connection.execute("PRAGMA foreign_keys=ON")
-    connection.execute("PRAGMA busy_timeout=15000")
-    return connection
+    try:
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA foreign_keys=ON")
+        connection.execute("PRAGMA busy_timeout=15000")
+        with connection:
+            yield connection
+    finally:
+        connection.close()
 
 
 def init_db():

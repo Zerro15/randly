@@ -1,12 +1,9 @@
-import os
 import tempfile
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-
-with tempfile.TemporaryDirectory() as temp:
-    pass
 
 from main import app
 
@@ -59,6 +56,39 @@ class RandlyApiTests(unittest.TestCase):
         correct=self.client.post("/api/auth/login",json={"username":"Tester22","password":"verystrongpassword"})
         self.assertEqual(correct.status_code,200)
         self.assertEqual(self.client.get("/api/auth/me").status_code,200)
+        import main
+        with main.connect() as db:
+            user = db.execute("SELECT salt,password_hash FROM users WHERE username=?", ("Tester22",)).fetchone()
+        self.assertEqual(len(user["salt"]), 32)
+        self.assertEqual(len(user["password_hash"]), 64)
+        self.assertNotEqual(user["password_hash"], "verystrongpassword")
+        for attempt in range(8):
+            self.assertEqual(self.client.post("/api/auth/login", json={
+                "username":"Tester22", "password":"incorrect"
+            }).status_code, 401, f"failed login {attempt + 1} should be allowed")
+        self.assertEqual(self.client.post("/api/auth/login", json={
+            "username":"Tester22", "password":"incorrect"
+        }).status_code, 429)
+
+    def test_concurrent_room_draws_are_unique_and_include_zero(self):
+        self.client.post("/api/auth/register", json={"username":"ConcurrentHost", "password":"verystrongpassword"})
+        room = self.client.post("/api/rooms", json={
+            "title":"Concurrent 1-9", "min_value":1, "max_value":9, "no_repeats":True
+        })
+        self.assertEqual(room.status_code, 201, room.text)
+        code = room.json()["code"]
+        with ThreadPoolExecutor(max_workers=9) as pool:
+            responses = list(pool.map(lambda _: self.client.post(f"/api/rooms/{code}/draw", json={}), range(9)))
+        self.assertTrue(all(response.status_code == 200 for response in responses), [r.text for r in responses])
+        self.assertEqual({response.json()["number"] for response in responses}, set(range(1, 10)))
+
+        edge_room = self.client.post("/api/rooms", json={
+            "title":"Negative and zero", "min_value":-1, "max_value":1, "no_repeats":True
+        })
+        self.assertEqual(edge_room.status_code, 201, edge_room.text)
+        edge_code = edge_room.json()["code"]
+        edge_numbers = [self.client.post(f"/api/rooms/{edge_code}/draw", json={}).json()["number"] for _ in range(3)]
+        self.assertEqual(set(edge_numbers), {-1, 0, 1})
 
     def test_cross_site_and_validation(self):
         res=self.client.post("/api/auth/register",headers={"Origin":"https://evil.invalid"},json={"username":"someone","password":"longpassphrase"})

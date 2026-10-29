@@ -1,0 +1,77 @@
+{
+  "registrationAndRoomCreation": true,
+  "hostGuestSync": true,
+  "guestControlsHidden": true,
+  "cookie": {
+    "httpOnly": true,
+    "sameSite": "Strict",
+    "secure": true,
+    "path": "/"
+  },
+  "responsive": [
+    {
+      "page": "account",
+      "viewport": 360,
+      "scrollWidth": 360
+    },
+    {
+      "page": "room",
+      "viewport": 360,
+      "scrollWidth": 360
+    },
+    {
+      "page": "account",
+      "viewport": 390,
+      "scrollWidth": 390
+    },
+    {
+      "page": "room",
+      "viewport": 390,
+      "scrollWidth": 390
+    },
+    {
+      "page": "account",
+      "viewport": 430,
+      "scrollWidth": 430
+    },
+    {
+      "page": "room",
+      "viewport": 430,
+      "scrollWidth": 430
+    },
+    {
+      "page": "account",
+      "viewport": 768,
+      "scrollWidth": 768
+    },
+    {
+      "page": "room",
+      "viewport": 768,
+      "scrollWidth": 768
+    },
+    {
+      "page": "account",
+      "viewport": 1280,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "room",
+      "viewport": 1280,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "account",
+      "viewport": 1920,
+      "scrollWidth": 1920
+    },
+    {
+      "page": "room",
+      "viewport": 1920,
+      "scrollWidth": 1920
+    }
+  ],
+  "consoleErrors": [],
+  "expectedConsoleResponses": [
+    "Unauthenticated startup GET /api/auth/me returns HTTP 401 before login; no JavaScript page errors."
+  ]
+}
