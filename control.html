@@ -1,0 +1,43 @@
+<!doctype html><html lang="ru"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="Randly — управление своей комнатой">
+<title>Randly — управление комнатой</title>
+<link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="./account.css"><link rel="stylesheet" href="./control.css">
+<script src="./control.js" defer></script></head>
+<body>
+<header class="header"><a class="logo" href="./">randly<span>.</span></a><a href="./account.html">← Мои комнаты</a></header>
+<main class="wrap"><div class="hero">
+<span class="tag">ПАНЕЛЬ ОРГАНИЗАТОРА</span><h1 id="title">Управление комнатой</h1>
+<p>Здесь можно подготовить результаты и открыть их участникам. Доступ только владельцу комнаты.</p></div>
+<div id="locked" class="card guard" role="status">Проверяем ваши права доступа…</div>
+<div id="adminPanel" class="grid" hidden>
+<section class="card">
+ <h2>Открытие результатов</h2><p class="secondary" id="roomDetails"></p>
+ <div class="showcase"><div class="showcase-label">ПОСЛЕДНИЙ РЕЗУЛЬТАТ</div>
+ <div class="showcase-number" id="latestValue">—</div><p class="secondary" id="latestSource">Пока нет результатов</p></div>
+ <p class="secondary" id="selfServiceHint" hidden>Каждый участник получит свою ссылку и самостоятельно откроет заранее назначенное задание. Здесь можно сбросить результаты или перейти на общий экран.</p>
+ <div class="actions"><button class="primary" id="drawBtn" type="button">Открыть следующий результат</button>
+ <button class="outline" id="resetBtn" type="button">Сбросить историю</button></div>
+ <p class="secondary">Случайные результаты выбираются сервером. Забронированные номера открываются по заранее заданному плану и отмечаются как подготовленные.</p>
+ <p><a id="guestLink" href="./room.html">Открыть экран для участников</a></p>
+</section>
+<section class="card" id="reservationCard" hidden>
+ <h2>Бронирование результата</h2>
+ <p class="secondary">Укажите номер будущего розыгрыша, результат и участника. Имя и число скрыты от гостей до открытия результата. В режиме без повторов каждое число можно забронировать только один раз.</p>
+ <form id="reserveForm">
+   <div class="cols"><label>Розыгрыш № <input id="slot" type="number" min="1" max="1000" value="1" required></label>
+   <label>Число <input id="number" type="number" step="1" required></label></div>
+   <label>Участник или @логин <input id="recipient" type="text" maxlength="64" autocomplete="off" placeholder="Например, Максим или @login" required></label>
+   <button class="primary wide" type="submit">Забронировать / заменить</button>
+ </form>
+ <div id="invitationResult" class="invite-result" hidden>
+   <label>Личная ссылка для участника <input id="invitationUrl" readonly aria-label="Ссылка-приглашение"></label>
+   <button class="outline" id="copyInvitation" type="button">Скопировать ссылку</button>
+   <p class="secondary">Ссылка содержит секретный код. Отправьте её только нужному участнику. При создании новой ссылки старая перестанет действовать.</p>
+ </div>
+ <h3>Ближайшие брони</h3><div id="reservations" class="reservation-list"><p class="secondary">Пока нет бронирований</p></div>
+ <p class="secondary">Бронь хранится в SQLite и сохраняется при перезапуске. Сброс истории запускает расписание с первого розыгрыша; уже открытые брони становятся доступными заново.</p>
+</section>
+</div><p id="message" class="message" role="status" aria-live="polite"></p></main></body></html>

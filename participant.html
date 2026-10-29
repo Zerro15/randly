@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer"><meta name="robots" content="noindex,nofollow">
+  <meta name="description" content="Откройте своё задание в Randly">
+  <title>Randly — моё задание</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./account.css"><link rel="stylesheet" href="./participant.css">
+  <script src="./participant.js" defer></script>
+</head>
+<body>
+<header class="header"><a class="logo" href="./">randly<span>.</span></a><a href="./">К генератору</a></header>
+<main class="participant-page">
+  <span class="tag">RANDLY · ЛИЧНОЕ ПРИГЛАШЕНИЕ</span>
+  <h1 id="roomTitle">Моё задание</h1>
+  <p class="intro">Это подготовленное организатором распределение. Каждая личная ссылка открывает одно заранее назначенное задание.</p>
+  <section class="ticket-card">
+    <p class="ticket-eyebrow">ВАШЕ НАЗНАЧЕНИЕ</p>
+    <div class="ticket-result" id="result" aria-live="polite">?</div>
+    <p class="ticket-caption" id="recipient">Результат пока не открыт</p>
+    <button class="primary ticket-action" type="button" id="revealBtn" disabled>Открыть моё задание</button>
+    <p class="secondary">Нажмите один раз. Повторное открытие этой ссылки покажет то же задание.</p>
+  </section>
+  <p id="message" class="message" role="status" aria-live="polite">Проверяем приглашение…</p>
+  <a class="back-link" id="sharedLink" href="./">Посмотреть общее распределение</a>
+</main>
+</body>
+</html>

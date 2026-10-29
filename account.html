@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Randly — аккаунт и общие комнаты для жеребьёвки">
+<title>Randly — аккаунт и комнаты</title><link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="./account.css"><script src="./account.js" defer></script>
+</head>
+<body>
+<header class="header"><a class="logo" href="./">randly<span>.</span></a><a href="./">← К генератору</a></header>
+<main class="wrap">
+ <section class="hero"><span class="tag">RANDLY · КОМНАТЫ</span><h1>Случайный выбор <em>вместе</em></h1>
+ <p>Генератор работает без регистрации. Аккаунт нужен только для своих комнат и сохранения настроек.</p></section>
+ <div class="grid">
+ <section class="card" id="authCard">
+ <h2>Войти или зарегистрироваться</h2>
+ <p class="secondary">Логин и пароль, без электронной почты</p>
+ <form id="authForm">
+  <label>Логин <input name="username" placeholder="например, bogdan" minlength="3" maxlength="24" pattern="[a-zA-Z0-9_]+" autocomplete="username" required></label>
+  <label>Пароль <input name="password" type="password" minlength="10" maxlength="128" autocomplete="current-password" required></label>
+  <div class="actions"><button class="primary" name="action" value="login" type="submit">Войти</button><button class="outline" name="action" value="register" type="submit">Зарегистрироваться</button></div>
+ </form>
+ <p class="note">Пароль от 10 символов. Для восстановления доступа потребуется отдельная функция — не используйте здесь критически важный пароль.</p>
+ </section>
+ <section class="card" id="profileCard" hidden>
+   <div class="split"><h2>Привет, <span id="username"></span>!</h2><button class="text-button" id="logoutBtn">Выйти</button></div>
+   <p class="secondary">Создавайте комнаты и сохраняйте наборы</p>
+   <h3>Новая комната</h3>
+   <form id="roomForm">
+     <label>Название <input name="title" maxlength="80" value="Общая жеребьёвка" required></label>
+     <div class="cols"><label>От <input name="min_value" type="number" value="1" min="-1000000" max="1000000" required></label>
+     <label>До <input name="max_value" type="number" value="9" min="-1000000" max="1000000" required></label></div>
+     <label class="checkbox"><input name="no_repeats" type="checkbox" checked> Не повторять числа до сброса</label>
+     <label class="checkbox" id="selfServiceOption" hidden><input name="self_service" type="checkbox"> Участники сами открывают задания по личной ссылке</label>
+     <p id="selfServiceDescription" class="secondary" hidden>Результаты подготавливаются заранее, затем каждый участник нажимает «Открыть задание» на своём телефоне. В обычных комнатах организатор проводит жеребьёвку.</p>
+     <button class="primary wide" type="submit">Создать комнату</button>
+   </form>
+   <h3>Мои комнаты</h3><div id="roomsList" class="room-list"><p class="secondary">Загружаем…</p></div>
+   <h3>Настройки между устройствами</h3>
+   <p class="secondary">Сохраняются параметры и наборы генераторов из текущего браузера. История отдельных жеребьёвок не синхронизируется.</p>
+   <div class="actions"><button class="outline" id="uploadBtn">Сохранить на сервер</button><button class="outline" id="downloadBtn">Загрузить на устройство</button></div>
+ </section>
+ <section class="card tip"><h2>Как устроена общая комната</h2>
+  <ol><li>Создайте комнату и выберите диапазон.</li><li>Отправьте приглашение или QR-код.</li><li>Общий экран показывает открытые результаты примерно каждые 2 секунды. В самостоятельном режиме участники открывают задания по личным ссылкам.</li><li>Только организатор управляет результатами в отдельной закрытой панели.</li></ol>
+  <p class="secondary">Для гостей аккаунт не нужен. Результаты бывают случайными или заранее подготовленными; тип каждого открытого результата указан на общем экране.</p>
+ </section>
+ </div>
+ <div id="message" class="message" role="status" aria-live="polite"></div>
+</main>
+</body>
+</html>

@@ -1,0 +1,90 @@
+name: Randly validation
+
+on:
+  push:
+    branches: [main, "feat/**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Validate frontend script syntax
+        run: |
+          node --check account.js
+          node --check room.js
+          node --check control.js
+          node --check participant.js
+      - name: Test browser-side randomness
+        run: node --test tests/random-core.test.cjs
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install API test dependencies
+        run: python -m pip install -r api/requirements.txt httpx==0.28.1
+      - name: Test accounts and shared room API
+        env:
+          PYTHONPATH: api
+        run: python -m unittest discover -s api/tests -v
+
+  docker-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Compose
+        run: docker compose config
+      - name: Build and start containers
+        env:
+          RANDLY_SECURE_COOKIES: "false" # Only for local HTTP test; production must use true.
+        run: docker compose up -d --build --wait
+      - name: Check static frontend and backend
+        run: |
+          curl --fail --silent --show-error http://127.0.0.1:8788/ > /dev/null
+          curl --fail --silent --show-error http://127.0.0.1:8788/account.html | grep "Войти или зарегистрироваться"
+          curl --fail --silent --show-error http://127.0.0.1:8788/room.html | grep "Общая жеребьёвка"
+          curl --fail --silent --show-error http://127.0.0.1:8788/control.html | grep "Управление комнатой"
+          curl --fail --silent --show-error http://127.0.0.1:8788/participant.html | grep "Моё задание"
+          curl --fail --silent --show-error http://127.0.0.1:8788/api/health | grep '"ok":true'
+      - name: Smoke test 40 simultaneous guests
+        run: python api/tests/load_smoke.py
+      - name: Diagnose on failure
+        if: failure()
+        run: docker compose logs --tail 120
+      - name: Stop
+        if: always()
+        run: docker compose down
+
+  browser-e2e:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Playwright
+        run: |
+          npm install --no-save playwright@1.56.0
+          npx playwright install --with-deps chromium
+      - name: Start isolated HTTP test stack with one admin account
+        env:
+          RANDLY_SECURE_COOKIES: "false"
+          RANDLY_RESERVATION_ADMIN_IDS: "1"
+        run: docker compose up -d --build --wait
+      - name: Click through individual invitations with Chromium
+        run: node tests/self-service-browser.cjs
+      - name: Container logs if failed
+        if: failure()
+        run: docker compose logs --tail 120
+      - name: Stop isolated test stack
+        if: always()
+        run: docker compose down --volumes

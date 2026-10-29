@@ -1,0 +1,46 @@
+[
+  {
+    "clients": 40,
+    "guest_requests": 400,
+    "failed_guest_requests": 0,
+    "guest_error_percent": 0.0,
+    "elapsed_seconds": 0.628,
+    "requests_per_second": 637.17,
+    "guest_latency_seconds": {
+      "p50": 0.0202,
+      "p95": 0.1342,
+      "p99": 0.1523
+    },
+    "concurrent_draws": 40,
+    "draw_successes": 40,
+    "draw_unique_numbers": 40,
+    "draw_failures": 0,
+    "draw_latency_p95_seconds": 0.6647,
+    "container_cpu_memory": [
+      "randly 0.00% 22.19MiB / 3.827GiB",
+      "randly-api 0.18% 48.86MiB / 3.827GiB"
+    ]
+  },
+  {
+    "clients": 100,
+    "guest_requests": 1000,
+    "failed_guest_requests": 0,
+    "guest_error_percent": 0.0,
+    "elapsed_seconds": 1.759,
+    "requests_per_second": 568.66,
+    "guest_latency_seconds": {
+      "p50": 0.0496,
+      "p95": 0.3782,
+      "p99": 0.4236
+    },
+    "concurrent_draws": 100,
+    "draw_successes": 100,
+    "draw_unique_numbers": 100,
+    "draw_failures": 0,
+    "draw_latency_p95_seconds": 1.1033,
+    "container_cpu_memory": [
+      "randly 0.02% 29.95MiB / 3.827GiB",
+      "randly-api 0.18% 49.77MiB / 3.827GiB"
+    ]
+  }
+]

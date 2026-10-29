@@ -12,7 +12,7 @@
   function saveFormState(){const saved={};for(const el of document.querySelectorAll('.tool-pane input,.tool-pane textarea,.tool-pane select'))if(el.id&&el.type!=='file')saved[el.id]=el.type==='checkbox'?el.checked:el.value;save('randly.inputs.v3',saved);}
   const { randomBelow, chooseIndex, secureShuffle, randomInteger, uniqueNumbers, weightedInteger } = window.RandlyCore;
   function parseLines(text) { return text.split(/\r?\n/).map(x => x.trim()).filter(Boolean); }
-  function validateInteger(v, name) { const n = Number(v); if (!Number.isSafeInteger(n)) throw Error(`${name}: введите целое число в безопасном диапазоне`); return BigInt(n); }
+  function validateInteger(v, name) { if (String(v).trim() === '') throw Error(`${name}: заполните поле`); const n = Number(v); if (!Number.isSafeInteger(n)) throw Error(`${name}: введите целое число в безопасном диапазоне`); return BigInt(n); }
   function parseWeightMap(raw) {
     const map=new Map(); if(!raw.trim())return map;
     for(const token of raw.split(/[,;]+/).map(x=>x.trim()).filter(Boolean)) { const m=token.match(/^(-?\d+)\s*:\s*(\d+)$/); if(!m)throw Error('Формат весов: 3:5, 7:2'); const n=Number(m[1]),w=Number(m[2]); if(!Number.isSafeInteger(n)||!Number.isInteger(w)||w<0||w>1000)throw Error('Вес должен быть целым числом от 0 до 1000');map.set(BigInt(n),w); }
