@@ -114,9 +114,10 @@ class RandlyApiTests(unittest.TestCase):
         self.assertEqual(guest.get(endpoint).status_code, 401)
         self.assertEqual(guest.put(endpoint, json={"slot": 2, "number": 9}).status_code, 401)
         self.assertEqual(guest.request("DELETE", endpoint + "/2", json={}).status_code, 401)
-        other.post("/api/auth/register", json={
+        student = other.post("/api/auth/register", json={
             "username": "OtherStudent", "password": "different-test-password"
         })
+        self.assertEqual(student.status_code, 201)
         self.assertEqual(other.get(endpoint).status_code, 403)
         self.assertEqual(other.put(endpoint, json={"slot": 2, "number": 9}).status_code, 403)
         self.assertEqual(other.request("DELETE", endpoint + "/2", json={}).status_code, 403)
@@ -131,31 +132,50 @@ class RandlyApiTests(unittest.TestCase):
         self.assertFalse(other.get(f"/api/rooms/{other_code}").json()["can_reserve"])
 
 
-        self.assertEqual(self.client.put(endpoint, json={"slot": 2, "number": 9}).status_code, 200)
-        self.assertEqual(self.client.put(endpoint, json={"slot": 4, "number": 7}).status_code, 200)
-        self.assertEqual(self.client.put(endpoint, json={"slot": 5, "number": 9}).status_code, 409)
-        self.assertEqual(self.client.put(endpoint, json={"slot": 3, "number": 30}).status_code, 422)
-        self.assertEqual(self.client.put(endpoint, json={"slot": 20, "number": 8}).status_code, 422)
+        self.assertEqual(self.client.put(endpoint, json={
+            "slot": 2, "number": 9, "recipient": "Максим"
+        }).status_code, 200)
+        self.assertEqual(self.client.put(endpoint, json={
+            "slot": 4, "number": 7, "recipient": "@otherstudent"
+        }).status_code, 200)
+        self.assertEqual(self.client.put(endpoint, json={
+            "slot": 5, "number": 8, "recipient": "@MissingUser"
+        }).status_code, 422)
+        self.assertEqual(self.client.put(endpoint, json={
+            "slot": 5, "number": 9, "recipient": "Ирина"
+        }).status_code, 409)
+        self.assertEqual(self.client.put(endpoint, json={
+            "slot": 3, "number": 30, "recipient": "Ирина"
+        }).status_code, 422)
+        self.assertEqual(self.client.put(endpoint, json={
+            "slot": 20, "number": 8, "recipient": "Ирина"
+        }).status_code, 422)
 
         admin_data = self.client.get(endpoint).json()
-        self.assertEqual([(r["slot"], r["number"]) for r in admin_data["reservations"]],
-                         [(2, 9), (4, 7)])
+        self.assertEqual([(r["slot"], r["number"], r["recipient"]) for r in admin_data["reservations"]],
+                         [(2, 9, "Максим"), (4, 7, "@OtherStudent")])
         public = guest.get(url).json()
         self.assertTrue(public["prepared_mode"])
         self.assertFalse(public["can_reserve"])
         self.assertTrue(self.client.get(url).json()["can_reserve"])
         self.assertNotIn("reservations", public)
+        self.assertNotIn("Максим", str(public))
+        self.assertNotIn("@OtherStudent", str(public))
         self.assertIsNone(public["latest"])
 
         first = self.client.post(url + "/draw", json={}).json()
         self.assertNotIn(first["number"], (7, 9))
         self.assertEqual(first["source"], "random")
         second = self.client.post(url + "/draw", json={}).json()
-        self.assertEqual(second, {"number": 9, "source": "prepared"})
+        self.assertEqual(second, {"number": 9, "source": "prepared", "recipient": "Максим"})
+        public_second = guest.get(url).json()
+        self.assertEqual(public_second["history"][0]["recipient"], "Максим")
+        self.assertNotIn("@OtherStudent", str(public_second))
         third = self.client.post(url + "/draw", json={}).json()
         self.assertNotIn(third["number"], (7, 9, first["number"]))
+        self.assertEqual(third["recipient"], "")
         fourth = self.client.post(url + "/draw", json={}).json()
-        self.assertEqual(fourth, {"number": 7, "source": "prepared"})
+        self.assertEqual(fourth, {"number": 7, "source": "prepared", "recipient": "@OtherStudent"})
 
         public_after = guest.get(url).json()
         self.assertEqual(public_after["latest"], 7)
@@ -170,12 +190,14 @@ class RandlyApiTests(unittest.TestCase):
         self.assertEqual(restarted["draw_count"], 0)
         self.assertFalse(restarted["reservations"][0]["revealed"])
         self.client.post(url + "/draw", json={})
-        self.assertEqual(self.client.post(url + "/draw", json={}).json()["number"], 9)
+        replayed = self.client.post(url + "/draw", json={}).json()
+        self.assertEqual(replayed["number"], 9)
+        self.assertEqual(replayed["recipient"], "Максим")
 
         # Reservation can be cancelled while still in the future.
         self.assertEqual(self.client.request("DELETE", endpoint + "/4", json={}).status_code, 200)
-        self.assertEqual([(r["slot"], r["number"]) for r in self.client.get(endpoint).json()["reservations"]],
-                         [(2, 9)])
+        self.assertEqual([(r["slot"], r["number"], r["recipient"]) for r in self.client.get(endpoint).json()["reservations"]],
+                         [(2, 9, "Максим")])
 
     def test_cross_site_and_validation(self):
         res=self.client.post("/api/auth/register",headers={"Origin":"https://evil.invalid"},json={"username":"someone","password":"longpassphrase"})

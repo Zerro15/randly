@@ -24,10 +24,11 @@
 </section>
 <section class="card" id="reservationCard" hidden>
  <h2>Бронирование результата</h2>
- <p class="secondary">Укажите номер будущего розыгрыша и результат. До открытия бронь не отправляется гостям. В режиме без повторов каждое число можно забронировать только один раз.</p>
+ <p class="secondary">Укажите номер будущего розыгрыша, результат и участника. Имя и число скрыты от гостей до открытия результата. В режиме без повторов каждое число можно забронировать только один раз.</p>
  <form id="reserveForm">
    <div class="cols"><label>Розыгрыш № <input id="slot" type="number" min="1" max="1000" value="1" required></label>
    <label>Число <input id="number" type="number" step="1" required></label></div>
+   <label>Участник или @логин <input id="recipient" type="text" maxlength="64" autocomplete="off" placeholder="Например, Максим или @login" required></label>
    <button class="primary wide" type="submit">Забронировать / заменить</button>
  </form>
  <h3>Ближайшие брони</h3><div id="reservations" class="reservation-list"><p class="secondary">Пока нет бронирований</p></div>

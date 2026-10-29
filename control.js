@@ -24,7 +24,7 @@ async function load(){if(busy)return;try{
  for(const entry of reservationData.reservations){
   const row=document.createElement('div');row.className='reservation-item';
   const details=document.createElement('div'),title=document.createElement('strong'),status=document.createElement('small');
-  title.textContent='Розыгрыш №'+entry.slot+' → '+entry.number;status.textContent=entry.revealed?'Уже открыт':'Ожидает открытия';details.append(title,status);
+  title.textContent=entry.recipient?entry.recipient+' — задание №'+entry.number:'Розыгрыш №'+entry.slot+' → '+entry.number;status.textContent=entry.revealed?'Уже открыт':'Ожидает открытия';details.append(title,status);
   const button=document.createElement('button');button.type='button';button.textContent='Удалить';button.disabled=entry.revealed;
   button.addEventListener('click',()=>act('/reservations/'+entry.slot,'DELETE'));
   row.append(details,button);list.append(row);
@@ -42,6 +42,7 @@ $('resetBtn').addEventListener('click',()=>act('/reset'));
 $('reserveForm').addEventListener('submit',e=>{e.preventDefault();
 const slot=Number($('slot').value),number=Number($('number').value);
 if(!Number.isSafeInteger(slot)||!Number.isSafeInteger(number)){msg('Нужны целые числа');return;}
-act('/reservations','PUT',{slot,number});});
+const recipient=$('recipient').value.trim();if(!recipient){msg('Укажите участника или @логин');return;}
+act('/reservations','PUT',{slot,number,recipient});});
 load();
 })();
