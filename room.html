@@ -1,0 +1,19 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Общая жеребьёвка Randly">
+<title>Randly — общая комната</title><link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="./account.css"><link rel="stylesheet" href="./room.css"><script src="./room.js" defer></script></head>
+<body><header class="header"><a class="logo" href="./">randly<span>.</span></a><a href="./account.html">← Мои комнаты</a></header>
+<main class="wrap"><div class="room-head"><span class="tag">ОБЩАЯ ЖЕРЕБЬЁВКА</span><h1 id="roomTitle">Загрузка комнаты…</h1><p id="roomInfo" class="secondary">Все видят одинаковые результаты</p></div>
+<div class="room-grid">
+<section class="card draw-panel">
+ <div class="result-label">ВЫПАВШЕЕ ЧИСЛО</div><div class="big-result" id="result" aria-live="polite">—</div>
+ <p class="secondary" id="roomStatus">Ожидание жеребьёвки</p>
+ <div class="host-controls" id="hostControls" hidden><button class="primary" id="drawBtn">Сгенерировать число</button><button class="outline" id="resetBtn">Сбросить историю</button></div>
+ <p class="secondary" id="guestInfo">Вы наблюдаете за жеребьёвкой. Результат выбирает организатор.</p>
+</section>
+<section class="card"><h2>Пригласить участников</h2><p class="secondary">Вход в комнату без регистрации. Отправьте ссылку в чат.</p>
+ <div class="invite"><input id="inviteUrl" readonly aria-label="Ссылка на комнату"><button class="outline" id="copyBtn">Копировать</button></div>
+ <img id="qr" class="qr" alt="QR-код приглашения" hidden>
+ <h3>История</h3><ol id="drawHistory" class="history"><li class="secondary">Пока нет результатов</li></ol>
+</section></div>
+<p id="message" class="message" role="status" aria-live="polite"></p></main></body></html>
