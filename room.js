@@ -8,6 +8,9 @@ $('qr').hidden=false;
 $('qr').onerror=()=>{$('qr').hidden=true;};
 $('copyBtn').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(url);msg('Ссылка скопирована');}catch{msg('Скопируйте ссылку из поля выше');}});
 async function refresh(){if(fetching||document.hidden)return;fetching=true;try{const room=await api('/rooms/'+code);
+ $('guestInfo').textContent=room.self_service?
+ 'Каждый участник открывает своё назначение по личной ссылке. Здесь отображаются уже открытые задания.':
+ 'Вы смотрите общий экран. Управление результатами доступно только организатору.';
  $('roomTitle').textContent=room.title;$('roomInfo').textContent='Диапазон: '+room.min+'–'+room.max+' · '+(room.no_repeats?'Без повторений':'Повторения возможны')+' · Организатор: '+room.host+(room.prepared_mode?' · Подготовленное распределение':' · Случайная жеребьёвка');
  const id=room.history[0]?.id??null;if(lastId!==id){lastId=id;$('result').textContent=room.latest===null?'—':String(room.latest);$('result').classList.remove('pop');void $('result').offsetWidth;$('result').classList.add('pop');}
  const latest=room.history[0];$('roomStatus').textContent=room.latest===null?'Ожидание первой жеребьёвки':latest?.source==='prepared'?(latest.recipient?latest.recipient+' — задание №'+latest.number:'Подготовленное распределение · общий результат'):'Случайный результат · общий для всех';
