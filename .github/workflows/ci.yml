@@ -16,6 +16,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
+      - name: Validate frontend script syntax
+        run: |
+          node --check account.js
+          node --check room.js
+          node --check control.js
       - name: Test browser-side randomness
         run: node --test tests/random-core.test.cjs
       - uses: actions/setup-python@v5
@@ -43,6 +48,7 @@ jobs:
           curl --fail --silent --show-error http://127.0.0.1:8788/ > /dev/null
           curl --fail --silent --show-error http://127.0.0.1:8788/account.html | grep "Войти или зарегистрироваться"
           curl --fail --silent --show-error http://127.0.0.1:8788/room.html | grep "Общая жеребьёвка"
+          curl --fail --silent --show-error http://127.0.0.1:8788/control.html | grep "Управление комнатой"
           curl --fail --silent --show-error http://127.0.0.1:8788/api/health | grep '"ok":true'
       - name: Smoke test 40 simultaneous guests
         run: python api/tests/load_smoke.py
