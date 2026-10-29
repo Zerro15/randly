@@ -80,6 +80,11 @@ def init_db():
         columns = {r["name"] for r in db.execute("PRAGMA table_info(draws)")}
         if "source" not in columns:
             db.execute("ALTER TABLE draws ADD COLUMN source TEXT NOT NULL DEFAULT 'random'")
+        if "recipient" not in columns:
+            db.execute("ALTER TABLE draws ADD COLUMN recipient TEXT NOT NULL DEFAULT ''")
+        reservation_columns = {r["name"] for r in db.execute("PRAGMA table_info(room_reservations)")}
+        if "recipient" not in reservation_columns:
+            db.execute("ALTER TABLE room_reservations ADD COLUMN recipient TEXT NOT NULL DEFAULT ''")
 
 
 @asynccontextmanager
@@ -180,6 +185,8 @@ class PreferencesPayload(BaseModel):
 class ReservationInput(BaseModel):
     slot: int = Field(ge=1, le=1000)
     number: int
+    # A participant may be a guest name or an existing account login written as @login.
+    recipient: str = Field(default="", max_length=64)
 
 
 @app.get("/api/health")
@@ -266,7 +273,7 @@ def set_preferences(data: PreferencesPayload, request: Request):
 
 
 def serialize_room(db, row, viewer_id=None):
-    entries = db.execute("SELECT id,number,source,created_at FROM draws WHERE room_id=? ORDER BY id DESC LIMIT 30",
+    entries = db.execute("SELECT id,number,source,recipient,created_at FROM draws WHERE room_id=? ORDER BY id DESC LIMIT 30",
                          (row["id"],)).fetchall()
     prepared_count = db.execute(
         "SELECT count(*) FROM room_reservations WHERE room_id=?", (row["id"],)
@@ -276,7 +283,7 @@ def serialize_room(db, row, viewer_id=None):
             "host": row["username"], "is_host": viewer_id == row["owner_id"],
             "can_reserve": viewer_id == row["owner_id"] and row["owner_id"] in RESERVATION_ADMIN_IDS,
             "prepared_mode": prepared_count > 0,
-            "history": [{"id": x["id"], "number": x["number"], "source": x["source"], "at": timestamp(x["created_at"])} for x in entries],
+            "history": [{"id": x["id"], "number": x["number"], "source": x["source"], "recipient": x["recipient"], "at": timestamp(x["created_at"])} for x in entries],
             "latest": entries[0]["number"] if entries else None}
 
 
@@ -371,11 +378,11 @@ def list_reservations(code: str, request: Request):
         room = owner_reservation_room(db, code, request)
         count = draw_count(db, room["id"])
         rows = db.execute(
-            "SELECT slot,number FROM room_reservations WHERE room_id=? ORDER BY slot",
+            "SELECT slot,number,recipient FROM room_reservations WHERE room_id=? ORDER BY slot",
             (room["id"],),
         ).fetchall()
         return {"draw_count": count, "reservations": [
-            {"slot": r["slot"], "number": r["number"], "revealed": r["slot"] <= count}
+            {"slot": r["slot"], "number": r["number"], "recipient": r["recipient"], "revealed": r["slot"] <= count}
             for r in rows
         ]}
 
@@ -404,12 +411,26 @@ def reserve_result(code: str, data: ReservationInput, request: Request):
             range_size = room["max_value"] - room["min_value"] + 1
             if data.slot > range_size:
                 raise HTTPException(422, "Номер розыгрыша превышает количество доступных чисел")
+        recipient = data.recipient.strip()
+        if any(ord(c) < 32 for c in recipient):
+            raise HTTPException(422, "Имя участника содержит недопустимые символы")
+        if recipient.startswith("@"):
+            login = recipient[1:]
+            if not USERNAME.fullmatch(login):
+                raise HTTPException(422, "После @ укажите существующий логин")
+            account = db.execute(
+                "SELECT username FROM users WHERE username=? COLLATE NOCASE", (login,)
+            ).fetchone()
+            if not account:
+                raise HTTPException(422, "Пользователь с таким логином не найден")
+            recipient = "@" + account["username"]
         db.execute(
-            """INSERT INTO room_reservations(room_id,slot,number,created_at)
-               VALUES(?,?,?,?)
+            """INSERT INTO room_reservations(room_id,slot,number,recipient,created_at)
+               VALUES(?,?,?,?,?)
                ON CONFLICT(room_id,slot) DO UPDATE SET
-                 number=excluded.number,created_at=excluded.created_at""",
-            (room["id"], data.slot, data.number, now()),
+                 number=excluded.number,recipient=excluded.recipient,
+                 created_at=excluded.created_at""",
+            (room["id"], data.slot, data.number, recipient, now()),
         )
         return {"ok": True, "slot": data.slot}
 
@@ -441,11 +462,12 @@ def draw(code: str, request: Request):
         lo, hi = row["min_value"], row["max_value"]
         slot = draw_count(db, row["id"]) + 1
         reservation = db.execute(
-            "SELECT number FROM room_reservations WHERE room_id=? AND slot=?",
+            "SELECT number,recipient FROM room_reservations WHERE room_id=? AND slot=?",
             (row["id"], slot),
         ).fetchone()
         if reservation:
             value = reservation["number"]
+            recipient = reservation["recipient"]
             source = "prepared"
         elif row["no_repeats"]:
             used = {r[0] for r in db.execute("SELECT number FROM draws WHERE room_id=?", (row["id"],))}
@@ -458,13 +480,15 @@ def draw(code: str, request: Request):
             if not pool:
                 raise HTTPException(409, "Все доступные числа заняты или выпали. Проверьте бронь")
             value = secrets.choice(pool)
+            recipient = ""
             source = "random"
         else:
             value = lo + secrets.randbelow(hi - lo + 1)
+            recipient = ""
             source = "random"
-        db.execute("INSERT INTO draws(room_id,number,source,created_at) VALUES (?,?,?,?)",
-                   (row["id"], value, source, now()))
-        return {"number": value, "source": source}
+        db.execute("INSERT INTO draws(room_id,number,source,recipient,created_at) VALUES (?,?,?,?,?)",
+                   (row["id"], value, source, recipient, now()))
+        return {"number": value, "source": source, "recipient": recipient}
 
 
 @app.post("/api/rooms/{code}/reset")
