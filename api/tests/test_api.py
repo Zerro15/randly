@@ -295,6 +295,45 @@ class RandlyApiTests(unittest.TestCase):
         self.assertEqual(return_again.status_code, 200)
         self.assertTrue(return_again.json()["already_revealed"])
 
+
+    def test_forty_independent_self_service_reveals(self):
+        import main
+        admin = self.client.post("/api/auth/register", json={
+            "username": "BulkHost", "password": "verystrongpassword"
+        })
+        self.assertEqual(admin.status_code, 201)
+        main.RESERVATION_ADMIN_IDS = {self.client.get("/api/auth/me").json()["id"]}
+        room = self.client.post("/api/rooms", json={
+            "title": "40 participants", "min_value": 1, "max_value": 40,
+            "no_repeats": True, "self_service": True
+        })
+        self.assertEqual(room.status_code, 201, room.text)
+        endpoint = "/api/rooms/" + room.json()["code"]
+        tickets = []
+        for slot in range(1, 41):
+            saved = self.client.put(endpoint + "/reservations", json={
+                "slot": slot, "number": slot, "recipient": "Student " + str(slot)
+            })
+            self.assertEqual(saved.status_code, 200, saved.text)
+            link = self.client.post(endpoint + f"/reservations/{slot}/invite", json={})
+            self.assertEqual(link.status_code, 200, link.text)
+            tickets.append(link.json()["ticket"])
+        self.assertEqual(len(set(tickets)), 40)
+        guest = TestClient(app)
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=40) as pool:
+            responses = list(pool.map(
+                lambda token: guest.post(endpoint + "/reveal", json={"ticket": token}), tickets
+            ))
+        self.assertTrue(all(r.status_code == 200 for r in responses),
+                        [(r.status_code, r.text) for r in responses if r.status_code != 200])
+        self.assertEqual({r.json()["number"] for r in responses}, set(range(1, 41)))
+        public = guest.get(endpoint).json()
+        self.assertEqual(len(public["history"]), 30)  # public history is intentionally capped
+        self.assertEqual(len({r["number"] for r in public["history"]}), 30)
+        state = self.client.get(endpoint + "/reservations").json()
+        self.assertEqual(sum(r["revealed"] for r in state["reservations"]), 40)
+
     def test_cross_site_and_validation(self):
         res=self.client.post("/api/auth/register",headers={"Origin":"https://evil.invalid"},json={"username":"someone","password":"longpassphrase"})
         self.assertEqual(res.status_code,403)
